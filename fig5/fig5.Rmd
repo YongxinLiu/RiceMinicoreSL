@@ -1,0 +1,133 @@
+---
+title: "Figure 5. Exiguobacterium R2567 inhibit rice tillering via the strigolactone pathway"
+author: "Yong-Xin Liu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo=T, comment=NA, message=F, warning=F,
+	fig.align="center", fig.width=5, fig.height=3, dpi=300)
+# Clean workspace
+rm(list=ls()) 
+source("http://210.75.224.110/stat_plot_functions.R")
+w=89
+h=59
+size=8
+```
+
+## 5. Exiguobacterium R2567 inhibit rice tillering via the strigolactone pathway
+
+```{r}
+df=read.table("data.txt", header=T, row.names=NULL, sep="\t", comment.char="")
+genotype = unique(df$Genotype)
+bacteria = unique(df$Bacteria)
+
+# Add strain metadata
+wet=read.table("../data/wet_strain_metadata.txt", header=T, row.names=NULL, sep="\t", comment.char="")
+merged = merge(df, wet, by.x="Bacteria",by.y="StockID", all.x = T)
+df=merged
+
+df = df[,c(1:7)]
+x = df[df$Bacteria %in% c("GF","R2567"),]
+# save data
+write.table("ID\t", file=paste("5_tiller.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(x, file=paste("5_tiller.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+
+x = df[df$Bacteria %in% c("GF","R2488"),]
+write.table("ID\t", file=paste("S10A_tiller.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(x, file=paste("S10A_tiller.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+
+swr = function(string, nwrap = 12){
+  paste(strwrap(string,width = nwrap),collapse = "\n")
+}
+swr = Vectorize(swr)
+df$FullName <- swr(df$FullName)
+
+level_list=""
+x=0
+for (i in genotype){
+    for (j in bacteria){
+    x=x+1
+    level_list[x]=paste(i, j, sep = "_")
+    }
+}
+df$GroupID=factor(df$GroupID, levels=level_list)
+dataframe=df
+library(amplicon)
+index="AdjustTillerNumber"
+groupID= "GroupID"
+
+i="R2567"
+df=dataframe
+df=df[df$Bacteria %in% c("GF",i),]
+
+df=df[,c( index, groupID, "Genotype","Bacteria","FullName")]
+df=na.omit(df)
+colnames(df)[1:2]=c(index, "group")
+model=aov(df[[index]] ~ group, data=df)
+Tukey_HSD=TukeyHSD(model, ordered=TRUE, conf.level=0.95)
+Tukey_HSD_table=as.data.frame(Tukey_HSD$group)
+write.table(paste(date(), "\nGroup\t", groupID, i, "\n\t", sep=""), file=paste("5.TukeyHSD.txt", sep=""), append=T, quote=F, eol="", row.names=F, col.names=F)
+suppressWarnings(write.table(Tukey_HSD_table, file=paste("5.TukeyHSD.txt", sep=""), append=T, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=T, col.names=T))
+generate_label_df=function(TUKEY, variable) {
+    Tukey.levels=TUKEY[[variable]][, 4]
+    Tukey.labels=data.frame(multcompLetters(Tukey.levels)["Letters"])
+    Tukey.labels$group=rownames(Tukey.labels)
+    Tukey.labels=Tukey.labels[order(Tukey.labels$group), 
+        ]
+    return(Tukey.labels)
+}
+library(multcompView)
+if (length(unique(df$group)) == 10) {
+    library(agricolae)
+    out=LSD.test(model, "group", p.adj="none")
+    stat=out$groups
+    df$stat=stat[as.character(df$group), ]$groups
+}else {
+    LABELS=generate_label_df(Tukey_HSD, "group")
+    df$stat=LABELS[as.character(df$group), ]$Letters
+}
+max=max(df[, c(index)])
+min=min(df[, index])
+x=df[, c("group", index)]
+y=x %>% group_by(group) %>% summarise_(Max=paste("max(", 
+    index, ")", sep=""))
+y=as.data.frame(y)
+rownames(y)=y$group
+df$y=y[as.character(df$group), ]$Max + (max - min) * 0.05
+
+p=ggplot(df, aes(x=group, y=df[[index]], color=Genotype)) + 
+    geom_boxplot(alpha=1, outlier.shape=NA, outlier.size=0, 
+        size=0.7, width=0.5, fill="transparent") + 
+    labs(x="Groups", y=paste(index, "index"), 
+        color=groupID) + theme_classic() + geom_text(data=df, 
+    aes(x=group, y=y, label=stat)) +  # color=group, 
+    geom_jitter(position=position_jitter(0.17), size=1, 
+        alpha=0.7) + theme(text=element_text(family="sans", 
+    size=7))
+p=p+theme_bw()+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1)) + theme(legend.position="right")
+
+df2 <- summarySE(df, measurevar=index, groupvars="group")
+df_stat=unique(df[,c("group","stat","y","Genotype","Bacteria","FullName")])
+idx=match(df_stat$group, df2$group)
+df2=df2[idx,]
+df2 = cbind(df2, df_stat)[,-1]
+
+df2$max=df2[[index]]+df2$se+0.06*max(df2[[index]])
+df2$Genotype = factor(df2$Genotype, levels=c("Nip","d53","d14","d10","d17"))
+levels(df2$Genotype)=c("Nipponbare","d53","d14","d10","d17")
+p=ggplot(data=df2, aes(x=group, y=.data[[index]], fill=Genotype)) +  # 
+    geom_bar(stat="identity", width=0.8) + 
+    labs(x="", y=paste("Tiller number"), color=groupID) + theme_classic() +
+    geom_errorbar(aes(ymin=.data[[index]]-se, ymax=.data[[index]]+se), width=.1) +
+    geom_text(data=df2, aes(x=group, y=max, label= stat)) +
+    geom_text(aes(label=round(.data[[index]],2), y=.data[[index]]/2), position=position_dodge(0.9), vjust=0,color="#dfe6e9")
+p=p+main_theme+theme(axis.text.x=element_text(angle=45,vjust=1, hjust=1),strip.text = element_text(size=8))
+p = p + facet_grid(~ Genotype, scales = "free_x", switch = "x")+scale_x_discrete(labels = as.factor(df2$FullName))
+p
+ggsave(paste0("5.", i,"_se_bar.pdf"), p, width=w*2, height=h*1.3, units="mm")
+```
+
+Manual rename label in the figure

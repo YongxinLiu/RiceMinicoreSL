@@ -7,6 +7,11 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_chunk$set(
+	echo=T, comment=NA, message=F, warning=F,
+	fig.align="center", fig.width=6, fig.height=4, dpi=300)
+
 # Clean workspace
 rm(list=ls())
 # Load home-made functions and parameters
@@ -65,7 +70,7 @@ otutab_metadata$ID = 1:dim(otutab_metadata)[1]
 ggsave(paste("S1b.accumulate.pdf", sep=""), ggplot2.two_y_axis(g1, g2), width = w*1.5, height = h*1.5, units = "mm")
 ```
 
-### 1C. Order-level distribution of the 285 root OTUs
+## 1C. Order-level distribution of the 285 root OTUs
 
 Belong to 34 orders, account for 86% relative abundance.
 
@@ -150,7 +155,7 @@ p1
 ggsave(paste("1c.miniCore_boxplot_Order.pdf", sep=""), p1, width = w*1.5, height = h*1.5, units = "mm")
 ```
 
-### 1D. Constrained PCoA with Bray–Curtis distance of the root microbiota by subspecies in field I
+## 1D. Constrained PCoA with Bray–Curtis distance of the root microbiota by subspecies in field I
 
 ```{r}
 metadata = read.table("../data/cultivar_LN_metadata.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
@@ -361,11 +366,11 @@ iqtree -s temp/consensus.fa -st DNA -m TEST -bb 1000 -alrt 1000 -nt 20 -pre fig1
 Then the tree file is visulized in iTOL (https://itol.embl.de/). 
 Save file as subspecies5_branch.svg and subspecies5_branchno.svg
 
-## S2B. Root microbiota show the same clustering patterns as tiller number and population structure of the field-grown rice population in field II
+### S2B. Root microbiota show the same clustering patterns as tiller number and population structure of the field-grown rice population in field II
 
 Root microbiota + Phenotype(Tiller number) + Genotype
 
-### Left. Clustering of root microbiota 
+#### Left. Clustering of root microbiota 
 
 ```{r}
 library(dplyr)
@@ -413,7 +418,7 @@ plot(dat_dist_clu, main = "Hclust with euclidean", lwd=1.5, cex=.5)
 dev.off()
 ```
 
-### Middle. Tiller number boxplot
+#### Middle. Tiller number boxplot
 
 ```{r}
 phenoHN = read.table("../data/cultivar_HN_pheno.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
@@ -430,7 +435,7 @@ p
 ggsave(paste("S2b.tiller_HN_subspecies.pdf", sep=""), p, width = 4, height =4 )
 ```
 
-### Right. Rice population structure
+#### Right. Rice population structure
 
 Same with Figure 1E Right panel.
 
@@ -474,7 +479,7 @@ rsquare <- sfit$r.squared
 write.table(paste("Genotype",rsquare,sep = "	"),file = "1f.contributionsFieldI.txt", append = TRUE, quote = F, sep="	", na = "NA", dec = ".", row.names = F, col.names = F)
 ```
 
-## S2C. Contributions of root microbiota and rice genotype to the total variation in tiller number in field II
+### S2C. Contributions of root microbiota and rice genotype to the total variation in tiller number in field II
 
 ```{r}
 # Tiller number
@@ -514,7 +519,7 @@ rsquare <- sfit$r.squared
 write.table(paste("Genotype",rsquare,sep = "	"),file = "S2c.contributionsFieldII.txt", append = TRUE, quote = F, sep="	", na = "NA", dec = ".", row.names = F, col.names = F)
 ```
 
-## S3. PCA/PCoA Scree plot
+### S3. PCA/PCoA Scree plot
 
 ```{r}
 # Read explained variance of genotype PCA and microbiota PCoA
