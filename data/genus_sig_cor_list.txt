@@ -1,4 +1,5 @@
 FieldI_postive	Gaiella
+FieldI_postive	Sphingomonas
 FieldI_postive	Geobacter
 FieldI_postive	Bacteroides
 FieldI_postive	Geothrix

@@ -1,8 +1,18 @@
 ---
-title: "Figure 2. Root microbiota structure shifts with increasing tiller number under field conditions"
+title: "Figure 2. Shifts in root microbiota structure with increasing rice tiller number under field conditions"
 author: "Yong-Xin Liu"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document:
+    df_print: paged
+    theme: cerulean
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+    code_fold: show
 ---
 
 ```{r setup, include=FALSE}
@@ -16,7 +26,9 @@ w=89
 h=59
 ```
 
-## 2A. Density plot showing the distribution of the tiller number of 165 field-grown rice varieties
+# Figure 2. Shifts in root microbiota structure with increasing rice tiller number under field conditions
+
+## 2A. Density plot showing the distribution of tiller number of 165 field-grown rice varieties. Dashed lines indicate equal-sized ranges of tiller numbers.
 
 ```{r LN_tiller}
 phenoLN = read.table("../data/cultivar_LN_pheno.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
@@ -33,11 +45,85 @@ library(ggpubr)
     xlab("Tiller number")+ylab("Percentage (%)") + 
     scale_x_continuous(breaks=vline, labels=vline) +
     main_theme +theme(legend.position="none")) # add = "mean", 
-ggsave(paste("2a.tiller_LN_density.pdf", sep=""), p, width = w, height = h, units = "mm")
+ggsave(paste("2A.tiller_LN_density.pdf", sep=""), p, width = w, height = h, units = "mm")
 ```
 
+(A) Density plot showing the distribution of tiller number of 165 field-grown rice varieties. Dashed lines indicate equal-sized ranges of tiller numbers.
 
-## 2B. Constrained PCoA with Bray–Curtis distance showing that rice varieties in each tiller number range harbored distinct root microbiota
+## 2B. Phylum-level distribution of root microbiota in each tiller number range. Proteobacteria are shown at the class level.
+
+```{r}
+metadata = read.table("../data/cultivar_LN_metadata.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
+level=c("<8","[8,13)","[13,18)","[18,23)","[23,28)",">=28")
+metadata$group = factor(metadata$group, level)
+
+tax_phylum = read.table(paste("../data/cultivar_LN_taxj_pc.txt",sep=""), header=T, row.names=1, sep="\t", comment.char="") 
+
+library(amplicon)
+(p = tax_stackplot(tax_phylum, metadata, topN = 8, groupID = "group", style = "group", sorted = "abundance"))
+# p = p + theme(legend.position = "bottom")
+ggsave(paste("2B.LN_tax_PC_tiller.pdf", sep=""), p, width = w*1.3, height = h*1.3, units = "mm")
+
+
+# tax_stackplot #----
+tax_sum = tax_phylum
+metadata = metadata
+topN = 8
+groupID = "group"
+style = "group"
+sorted = "abundance"
+
+p_list = c("ggplot2", "reshape2")
+for (p in p_list) {
+    if (!requireNamespace(p)) {
+        install.packages(p)
+    }
+    library(p, character.only = TRUE, quietly = TRUE, warn.conflicts = FALSE)
+}
+idx = rownames(metadata) %in% colnames(tax_sum)
+metadata = metadata[idx, ]
+tax_sum = tax_sum[, rownames(metadata)]
+sampFile = as.data.frame(metadata[, groupID], row.names = row.names(metadata))
+colnames(sampFile)[1] = "group"
+mean_sort = as.data.frame(tax_sum[(order(-rowSums(tax_sum))), ])
+other = colSums(mean_sort[topN:dim(mean_sort)[1], ])
+mean_sort = mean_sort[1:(topN - 1), ]
+mean_sort = rbind(mean_sort, other)
+rownames(mean_sort)[topN] = c("Other")
+merge_tax = mean_sort
+
+# Correlation with sample RA with tiller ranges
+group.cor = as.data.frame(cor(t(mean_sort), as.numeric(gsub("T","",metadata$tiller_cat)), method = "spearman"))
+library(psych)
+p = corr.test(t(mean_sort), as.numeric(gsub("T","",metadata$tiller_cat)), method = "spearman")  
+group.cor2 = cbind(group.cor, p$p)
+colnames(group.cor2)=c("Cor","Pvalue")
+write.table("OTUID\t", file=paste("2B.LN_phylum_tax_cor_sample.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(round(group.cor2,digits = 3), file=paste("2B.LN_phylum_tax_cor_sample.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+
+mat_t = t(merge_tax)
+mat_t2 = merge(sampFile, mat_t, by = "row.names")
+mat_t2 = mat_t2[, c(-1)]
+mat_mean = aggregate(mat_t2[, -1], by = mat_t2[1], FUN = mean)
+mat_mean_final = do.call(rbind, mat_mean)[-1, ]
+geno = mat_mean$group
+colnames(mat_mean_final) = geno
+mean_sort = as.data.frame(mat_mean_final)
+mean_sort$Taxonomy = rownames(mean_sort)
+data_all = as.data.frame(melt(mean_sort, id.vars = c("Taxonomy")))
+
+# Correlation with group mean RA with tiller ranges
+group.cor = as.data.frame(cor(t(mean_sort[,1:6]), 1:6, method = "spearman"))
+library(psych)
+p = corr.test(t(mean_sort[,1:6]), 1:6, method = "spearman")  #计算p值
+# p$p
+group.cor2 = cbind(group.cor, p$p)
+colnames(group.cor2)=c("Cor","Pvalue")
+write.table("OTUID\t", file=paste("2B.LN_phylum_tax_cor.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(round(group.cor2,digits = 3), file=paste("2B.LN_phylum_tax_cor.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+```
+
+## 2C. Constrained PCoA with Bray–Curtis distance showing that rice varieties in each tiller number range harbored distinct root microbiota
 
 ```{r}
 metadata = read.table("../data/cultivar_LN_metadata.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
@@ -86,8 +172,8 @@ p = p + stat_ellipse(level=0.68,aes(fill = group), geom = "polygon", alpha = 0.2
 p
 
 # save data table
-write.table("Axis\t", file=paste("2b_cpcoa.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
-suppressWarnings(write.table(points, file=paste("2b_cpcoa.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+write.table("Axis\t", file=paste("2C.cpcoa.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(points, file=paste("2C.cpcoa.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
 
 
 arrows_pos = points %>% group_by(group) %>% summarise_all(mean)
@@ -97,17 +183,83 @@ arrows_pos = cbind(arrows_pos[1:(n-1),2:3], arrows_pos[2:n,2:3])
 colnames(arrows_pos) = c("x","y","xend","yend")
 p = p + geom_segment(data = arrows_pos, aes(x = x, y = y, xend = xend, yend = yend),
                   arrow = arrow(length = unit(0.2, "cm")),color="black",alpha=0.6)
-p = p + theme(legend.position = "bottom")
+# p = p + theme(legend.position = "bottom")
 p
-ggsave(paste("2b.LN_beta_cpcoa_tiller.pdf", sep=""), p, width = w, height = h*1.3, units = "mm")
+ggsave(paste("2C.LN_beta_cpcoa_tiller.pdf", sep=""), p, width = w, height = h*1.3, units = "mm")
 ```
 
-## 2C. OTU richness of root microbiota in rice plants within each tiller number range
+(C) Constrained PCoA with Bray–Curtis distance showing that rice varieties in each tiller number range harbored distinct root microbiota (P = 0.001, permutational multivariate analysis of variance by Adonis). Ellipses cover 68% of the root microbiota from varieties in each tiller range. Arrows connect the geometric center of root microbiota from low to high tiller number ranges. 
+
+## 2D. Scatter plot showing the association between root microbiota coordinates in the first axis of constrained PCoA and corresponding tiller numbers
+
+```{r}
+method = "spearman"
+pheno = "tiller" 
+phenotype = read.table("../data/cultivar_LN_pheno.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
+beta = read.table("../fig1/1d.cpcoa.txt", header=T, row.names=1, sep="\t", comment.char="",quote="")
+Subspecies = read.table(paste0("../data/cultivar.txt"), header=T, row.names=1, sep="\t", comment.char="",quote="")
+beta = as.data.frame(t(beta))
+# filter
+idx = colnames(beta) %in% rownames(phenotype)
+beta = beta[,idx]
+phenotype = phenotype[colnames(beta),]
+
+beta_mean = as.data.frame(rowMeans(beta))
+beta_median = as.data.frame(apply(beta,1,median))
+
+top = c("CAP1","CAP2")
+idx = top %in% rownames(beta)
+top = top[idx]
+beta = beta[top,]
+data = cbind(t(beta), phenotype, Subspecies[rownames(phenotype),c("Subspecies")])
+colnames(data)[length(colnames(data))] = "Subspecies"
+
+write.table("Genus\t", file=paste("2D.beta.tiller.Cor.LN.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(data, file=paste("2D.beta.tiller.Cor.LN.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+
+result = matrix(0, ncol = 9, nrow = ncol(t(beta)))
+colnames(result) = c("feature", "env", "rho", "pvalue", "r2", "slope", "intercept", "mean", "median")
+
+for (i in 1:length(top)){
+  df = data[,c(top[i], pheno)] 
+  cor = cor.test(df[,1], df[,2], method = method)
+  result[i,1] = colnames(df)[1]
+  result[i,2] = colnames(df)[2]
+  result[i,3] = cor$estimate
+  result[i,4] = cor$p.value
+  df2 = df
+  colnames(df2) = c("x", "y")
+  m = lm(y ~ x, df2)
+  eqn = lm_eqn(df2)
+  result[i,5] = summary(m)$r.squared
+  result[i,6] = coef(m)[2]
+  result[i,7] = coef(m)[1]
+  result[i,8] = beta_mean[top[i],]
+  result[i,9] = beta_median[top[i],]
+  if (is.na(cor$estimate)){
+    next;
+  }
+  library(RColorBrewer)
+  p = ggplot(df2, aes(x, y)) +
+    geom_point(size=0.7) + 
+    geom_smooth(method = "lm") +
+    labs(x = top[i], y = pheno,
+         title = paste("r = " , round(cor$estimate, digits = 2), ",p = " , signif(cor$p.value, digits = 2), ", R2 = ", round(summary(m)$r.squared, digits = 2) , sep = ""))  +  #  
+    theme_bw() + main_theme  + ylab("Tiller number") + theme(plot.title=element_text(size=7),text = element_text(family = "sans", size = 7), axis.text=element_text(size=7))
+  ggsave(paste("2D.LN_cor", top[i], ".pdf", sep = "_"), p,  width = w, height = h, units = "mm") 
+}
+```
+
+(D) Scatter plot showing the association between root microbiota coordinates in the first axis of constrained PCoA and corresponding tiller numbers in 165 rice varieties (P = 4.3 x 10^-13, r = 0.53).
+
+## 2E. OTU richness of root microbiota in rice plants within each tiller number range
 
 ```{r}
 library(amplicon)
 alpha = read.table(paste("../data/cultivar_LN_alpha.txt",sep=""), header=T, row.names=1, sep="\t", comment.char="") 
 design = read.table("../data/cultivar_LN_metadata.txt", header=T, row.names=1, sep="\t")
+level=c("<8","[8,13)","[13,18)","[18,23)","[23,28)",">=28")
+design$group = factor(design$group, level)
 
 # fiLter data
 sub_design = design
@@ -119,28 +271,117 @@ method = c("richness","shannon_e")
 for(m in method){
   alpha_index = m # "richness"
   (p = alpha_boxplot(alpha, index = alpha_index, sub_design, groupID = "group") + theme(legend.position = "none"))
-  ggsave(paste("2c.LN_alpha_", alpha_index, "_tiller_group6.pdf", sep=""), p, width = w, height = h, units = "mm")
+  ggsave(paste("2E.LN_alpha_", alpha_index, "_tiller_group6.pdf", sep=""), p, width = w, height = h, units = "mm")
 }
 ```
 
-## 2D. Phylum-level distribution of root microbiota in each tiller number range. Proteobacteria are shown at the class level
+(E) The Shannon index of root microbiota in rice plants within each tiller number range. The Shannon index observed in the root microbiota tended to increase with increasing tiller number. The horizontal bars within boxes represent medians. The tops and bottoms of the boxes represent the 75th and 25th percentiles, respectively. The upper and lower whiskers extend to data within no more than 1.5× the interquartile range from the upper edge and lower edge of the box, respectively. Different letters indicate significantly different groups (P < 0.05, ANOVA, Tukey’s HSD).
+
+## 2F. Association between the Shannon indexes of root microbiota and corresponding tiller numbers
 
 ```{r}
-metadata = read.table("../data/cultivar_LN_metadata.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
-level=c("<8","[8,13)","[13,18)","[18,23)","[23,28)",">=28")
+method = "spearman"
+pheno = "tiller" 
+
+phenotype = read.table("../data/cultivar_LN_pheno.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
+alpha = read.table("../data/cultivar_LN_alpha.txt", header=T, row.names=1, sep="\t", comment.char="",quote="")
+Subspecies = read.table(paste0("../data/cultivar.txt"), header=T, row.names=1, sep="\t", comment.char="",quote="")
+alpha = as.data.frame(t(alpha))
+# filter
+idx = colnames(alpha) %in% rownames(phenotype)
+alpha = alpha[,idx]
+phenotype = phenotype[colnames(alpha),]
+
+alpha_mean = as.data.frame(rowMeans(alpha))
+alpha_median = as.data.frame(apply(alpha,1,median))
+
+# select alpha index
+top = c("richness","shannon_e","chao1")
+# filter
+idx = top %in% rownames(alpha)
+top = top[idx]
+alpha = alpha[top,]
+data = cbind(t(alpha), phenotype, Subspecies[rownames(phenotype),c("Subspecies")])
+colnames(data)[length(colnames(data))] = "Subspecies"
+
+# Save table
+write.table("Genus\t", file=paste("2F.alpha.tiller.Cor.LN.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(data, file=paste("2F.alpha.tiller.Cor.LN.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+
+result = matrix(0, ncol = 9, nrow = ncol(t(alpha)))
+colnames(result) = c("feature", "env", "rho", "pvalue", "r2", "slope", "intercept", "mean", "median")
+
+for (i in 1:length(top)){
+  df = data[,c(top[i], pheno)] 
+  cor = cor.test(df[,1], df[,2], method = method)
+  result[i,1] = colnames(df)[1]
+  result[i,2] = colnames(df)[2]
+  result[i,3] = cor$estimate
+  result[i,4] = cor$p.value
+  df2 = df
+  colnames(df2) = c("x", "y")
+  m = lm(y ~ x, df2)
+  eqn = lm_eqn(df2)
+  result[i,5] = summary(m)$r.squared
+  result[i,6] = coef(m)[2]
+  result[i,7] = coef(m)[1]
+  result[i,8] = alpha_mean[top[i],]
+  result[i,9] = alpha_median[top[i],]
+  if (is.na(cor$estimate)){
+    next;
+  }
+  library(RColorBrewer)
+  p = ggplot(df2, aes(x, y)) +
+    geom_point(size=0.7) + # aes(color=group)
+    geom_smooth(method = "lm") +
+    labs(x = top[i], y = pheno,
+         title = paste("r = " , round(cor$estimate, digits = 2), ", p = " , signif(cor$p.value, digits = 2), ", R2 = ", round(summary(m)$r.squared, digits = 2) , sep = ""))  +  # "Rho = " , round(cor$estimate, digits = 2), ", 
+    theme_bw() + main_theme  + ylab("Tiller number") + theme(plot.title=element_text(size=7),text = element_text(family = "sans", size = 7), axis.text=element_text(size=7))
+  ggsave(paste("2F.LN_cor", top[i], ".pdf", sep = "_"), p,  width = w, height = h, units = "mm") }
+```
+
+(F) Scatter plot showing the association between the Shannon indexes of root microbiota and corresponding tiller numbers in 165 rice varieties (P = 3.9  1012, r = 0.51). Note that data obtained in the other test field showed the same trend (Figure S4). The numbers of varieties are as follows: aus (n = 37), indica (n = 66), tropical japonica (n = 35), and temperate japonica (n = 27).
+
+# Figure S4. Shifts in root microbiota structure with increasing tiller number of rice varieties grown in the other test field; related to Figure 2
+
+## S4A. Density plot showing the distribution of tiller number for 165 rice varieties grown in the other test field
+
+```{r HN_tiller}
+phenoHN = read.table("../data/cultivar_HN_pheno.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
+phenoHN$soiltype = "HN"
+pheno = phenoHN
+step = 7
+vline = sort(unique(round((pheno$tiller-5)/step)*step+step*0.5+5+0.5))
+vline = vline[1:length(vline)-1]
+library(ggpubr)
+(p = ggdensity(pheno, x="tiller", rug = TRUE, color = "soiltype", 
+               fill = "soiltype",palette = c("#00AFBB", "#E7B800")) + 
+    geom_vline(xintercept = vline,linetype=4)+ 
+    xlab("Tiller number")+ylab("Percentage (%)") + 
+    scale_x_continuous(breaks=vline, labels=vline) +
+    main_theme +theme(legend.position="none")) # add = "mean", 
+ggsave(paste("S4A.tiller_HN_density.pdf", sep=""), p, width = w, height = h, units = "mm")
+```
+
+(A) Density plot showing the distribution of tiller number for 165 rice varieties grown in the other test field. Dashed lines indicate equal-sized ranges of tiller number. 
+
+## S4B. Phylum-level distribution of root microbiota in each tiller number range grown in other test field
+
+```{r}
+metadata = read.table("../data/cultivar_HN_metadata.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
+level = c("<16","[16,23)","[23,30)","[30,37)","[37,44)",">=44")
 metadata$group = factor(metadata$group, level)
 
-tax_phylum = read.table(paste("../data/cultivar_LN_taxj_pc.txt",sep=""), header=T, row.names=1, sep="\t", comment.char="") 
+tax_phylum = read.table(paste("../data/cultivar_HN_taxj_pc.txt",sep=""), header=T, row.names=1, sep="\t", comment.char="") 
 
 library(amplicon)
 (p = tax_stackplot(tax_phylum, metadata, topN = 8, groupID = "group", style = "group", sorted = "abundance"))
-p = p + theme(legend.position = "bottom")
-ggsave(paste("2d.LN_tax_PC_tiller.pdf", sep=""), p, width = w, height = h*1.3, units = "mm")
-
+p = p + xlab("Ranges of tiller number") + theme(legend.position = "bottom")
+ggsave(paste("S4B.HN_tax_PC_tiller.pdf", sep=""), p, width = w, height = h*1.3, units = "mm")
 
 # tax_stackplot #----
 tax_sum = tax_phylum
-metadata = metadata
+metadat = metadata
 topN = 8
 groupID = "group"
 style = "group"
@@ -158,21 +399,21 @@ metadata = metadata[idx, ]
 tax_sum = tax_sum[, rownames(metadata)]
 sampFile = as.data.frame(metadata[, groupID], row.names = row.names(metadata))
 colnames(sampFile)[1] = "group"
-mean_sort = as.data.frame(tax_sum[(order(-rowSums(tax_sum))), ])
+mean_sort = as.data.frame(tax_sum[(order(-rowSums(tax_sum))), 
+    ])
 other = colSums(mean_sort[topN:dim(mean_sort)[1], ])
 mean_sort = mean_sort[1:(topN - 1), ]
 mean_sort = rbind(mean_sort, other)
 rownames(mean_sort)[topN] = c("Other")
 merge_tax = mean_sort
 
-# Correlation with sample RA with tiller ranges
 group.cor = as.data.frame(cor(t(mean_sort), as.numeric(gsub("T","",metadata$tiller_cat)), method = "spearman"))
 library(psych)
 p = corr.test(t(mean_sort), as.numeric(gsub("T","",metadata$tiller_cat)), method = "spearman")  
 group.cor2 = cbind(group.cor, p$p)
 colnames(group.cor2)=c("Cor","Pvalue")
-write.table("OTUID\t", file=paste("2d.LN_phylum_tax_cor_sample.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
-suppressWarnings(write.table(round(group.cor2,digits = 3), file=paste("2d.LN_phylum_tax_cor_sample.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+write.table("OTUID\t", file=paste("S4B.HN_phylum_tax_cor_sample.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(round(group.cor2,digits = 3), file=paste("S4B.HN_phylum_tax_cor_sample.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
 
 mat_t = t(merge_tax)
 mat_t2 = merge(sampFile, mat_t, by = "row.names")
@@ -185,42 +426,23 @@ mean_sort = as.data.frame(mat_mean_final)
 mean_sort$Taxonomy = rownames(mean_sort)
 data_all = as.data.frame(melt(mean_sort, id.vars = c("Taxonomy")))
 
-# Correlation with group mean RA with tiller ranges
 group.cor = as.data.frame(cor(t(mean_sort[,1:6]), 1:6, method = "spearman"))
 library(psych)
 p = corr.test(t(mean_sort[,1:6]), 1:6, method = "spearman")  #计算p值
 # p$p
 group.cor2 = cbind(group.cor, p$p)
 colnames(group.cor2)=c("Cor","Pvalue")
-write.table("OTUID\t", file=paste("2d.LN_phylum_tax_cor.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
-suppressWarnings(write.table(round(group.cor2,digits = 3), file=paste("2d.LN_phylum_tax_cor.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+write.table("OTUID\t", file=paste("S4B.HN_phylum_tax_cor.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(round(group.cor2,digits = 3), file=paste("S4B.HN_phylum_tax_cor.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
 ```
 
-### S4A. Density plot showing the distribution of tiller number for 165 rice varieties grown in the other test field
+(B) Phylum-level distribution of root microbiota in each tiller number range. Proteobacteria are shown at the class level.
 
-```{r HN_tiller}
-phenoHN = read.table("../data/cultivar_HN_pheno.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
-phenoHN$soiltype = "HN"
-pheno = phenoHN
-step = 7
-vline = sort(unique(round((pheno$tiller-5)/step)*step+step*0.5+5+0.5))
-vline = vline[1:length(vline)-1]
-library(ggpubr)
-(p = ggdensity(pheno, x="tiller", rug = TRUE, color = "soiltype", 
-               fill = "soiltype",palette = c("#00AFBB", "#E7B800")) + 
-    geom_vline(xintercept = vline,linetype=4)+ 
-    xlab("Tiller number")+ylab("Percentage (%)") + 
-    scale_x_continuous(breaks=vline, labels=vline) +
-    main_theme +theme(legend.position="none")) # add = "mean", 
-ggsave(paste("S2a.tiller_HN_density.pdf", sep=""), p, width = w, height = h, units = "mm")
-```
-
-
-### S4B. Constrained PCoA with Bray–Curtis distance showing that rice varieties in each tiller number range harbored distinct root microbiota
+## S4C. Constrained PCoA with Bray–Curtis distance showing that rice varieties in each tiller number range harbored distinct root microbiota
 
 ```{r}
 metadata = read.table("../data/cultivar_HN_metadata.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
-level=c("<16","[16,23)","[23,30)","[30,37)","[38,45)",">=45")
+level = c("<16","[16,23)","[23,30)","[30,37)","[37,44)",">=44")
 metadata$group = factor(metadata$group, level)
 
 sub_design = metadata
@@ -263,8 +485,8 @@ p = p + stat_ellipse(level=0.68,aes(fill = group), geom = "polygon", alpha = 0.2
 p
 
 # save data table
-write.table("Axis\t", file=paste("S4b_cpcoa.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
-suppressWarnings(write.table(points, file=paste("S4b_cpcoa.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+write.table("Axis\t", file=paste("S4C.cpcoa.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(points, file=paste("S4C.cpcoa.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
 
 arrows_pos = points %>% group_by(group) %>% summarise_all(mean)
 arrows_pos = as.data.frame(arrows_pos)
@@ -273,19 +495,85 @@ arrows_pos = cbind(arrows_pos[1:(n-1),2:3], arrows_pos[2:n,2:3])
 colnames(arrows_pos) = c("x","y","xend","yend")
 p = p + geom_segment(data = arrows_pos, aes(x = x, y = y, xend = xend, yend = yend),
                   arrow = arrow(length = unit(0.2, "cm")),color="black",alpha=0.6)
-p = p + theme(legend.position = "bottom")
+# p = p + theme(legend.position = "bottom")
 p
-ggsave(paste("S4b.HN_beta_cpcoa_tiller.pdf", sep=""), p, width = w, height = h*1.3, units = "mm")
+ggsave(paste("S4C.HN_beta_cpcoa_tiller.pdf", sep=""), p, width = w, height = h*1.3, units = "mm")
 ```
 
-### S4C. OTU richness of root microbiota in rice plants within each tiller number range
+(C) Constrained PCoA with Bray–Curtis distance showing that rice varieties in each tiller number range harbored distinct root microbiota (P = 0.001, permutational multivariate analysis of variance by Adonis). Ellipses cover 68% of the root microbiota from varieties in each tiller range. Arrows connect the geometric center of root microbiota from low to high tiller number ranges. 
+
+## S4D. Association between root microbiota coordinates in the first axis of constrained PCoA
+
+```{r}
+method = "spearman"
+pheno = "tiller" 
+phenotype = read.table("../data/cultivar_HN_pheno.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
+beta = read.table("../fig1/HN_cpcoa.txt", header=T, row.names=1, sep="\t", comment.char="",quote="")
+Subspecies = read.table(paste0("../data/cultivar.txt"), header=T, row.names=1, sep="\t", comment.char="",quote="")
+beta = as.data.frame(t(beta))
+# filter
+idx = colnames(beta) %in% rownames(phenotype)
+beta = beta[,idx]
+phenotype = phenotype[colnames(beta),]
+
+beta_mean = as.data.frame(rowMeans(beta))
+beta_median = as.data.frame(apply(beta,1,median))
+
+top = c("CAP1","CAP2")
+idx = top %in% rownames(beta)
+top = top[idx]
+beta = beta[top,]
+data = cbind(t(beta), phenotype, Subspecies[rownames(phenotype),c("Subspecies")])
+colnames(data)[length(colnames(data))] = "Subspecies"
+
+write.table("Genus\t", file=paste("S4D.beta.tiller.Cor.HN.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(data, file=paste("S4D.beta.tiller.Cor.HN.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+
+result = matrix(0, ncol = 9, nrow = ncol(t(beta)))
+colnames(result) = c("feature", "env", "rho", "pvalue", "r2", "slope", "intercept", "mean", "median")
+
+for (i in 1:length(top)){
+  df = data[,c(top[i], pheno)] 
+  cor = cor.test(df[,1], df[,2], method = method)
+  result[i,1] = colnames(df)[1]
+  result[i,2] = colnames(df)[2]
+  result[i,3] = cor$estimate
+  result[i,4] = cor$p.value
+  df2 = df
+  colnames(df2) = c("x", "y")
+  m = lm(y ~ x, df2)
+  eqn = lm_eqn(df2)
+  result[i,5] = summary(m)$r.squared
+  result[i,6] = coef(m)[2]
+  result[i,7] = coef(m)[1]
+  result[i,8] = beta_mean[top[i],]
+  result[i,9] = beta_median[top[i],]
+  if (is.na(cor$estimate)){
+    next;
+  }
+  library(RColorBrewer)
+  p = ggplot(df2, aes(x, y)) +
+    geom_point(size=0.7) + 
+    geom_smooth(method = "lm") +
+    labs(x = top[i], y = pheno,
+         title = paste("r = " , round(cor$estimate, digits = 2), ",p = " , signif(cor$p.value, digits = 2), ", R2 = ", round(summary(m)$r.squared, digits = 2) , sep = ""))  +  #  
+    theme_bw() + main_theme  + ylab("Tiller number") + theme(plot.title=element_text(size=7),text = element_text(family = "sans", size = 7), axis.text=element_text(size=7))
+  ggsave(paste("S4D.HN_cor", top[i], ".pdf", sep = "_"), p,  width = w, height = h, units = "mm") 
+}
+```
+
+(D) Scatter plot showing the association between root microbiota coordinates in the first axis of constrained PCoA and corresponding tiller numbers in 165 rice varieties (P = 1.3 x 10^-7, r = 0.40).
+ 
+## S4E. OTU shannon index of root microbiota in rice plants within each tiller number range
 
 ```{r}
 library(amplicon)
 alpha = read.table(paste("../data/cultivar_HN_alpha.txt",sep=""), header=T, row.names=1, sep="\t", comment.char="") 
 design = read.table("../data/cultivar_HN_metadata.txt", header=T, row.names=1, sep="\t")
+level = c("<16","[16,23)","[23,30)","[30,37)","[37,44)",">=44")
+design$group = factor(design$group, level)
 
-# fiLter data
+# filter data
 sub_design = design
 idx = rownames(sub_design) %in% rownames(alpha)
 sub_design=sub_design[idx,]
@@ -297,77 +585,73 @@ for(m in method){
   (p = alpha_boxplot(alpha, index = alpha_index, sub_design, groupID = "group")+main_theme + theme(legend.position = "none")+ 
     xlab("Ranges of tiller number")
     )
-  ggsave(paste("S4c.HN_alpha_", alpha_index, "_tiller_group6.pdf", sep=""), p, width = w, height = h, units = "mm")
+  ggsave(paste("S4E.HN_alpha_", alpha_index, "_tiller_group6.pdf", sep=""), p, width = w, height = h, units = "mm")
 }
 ```
 
-### S4D. Phylum-level distribution of root microbiota in each tiller number range grown in other test field
+(E) The Shannon index of root microbiota in rice plants within each tiller number range. The Shannon index observed in the root microbiota tended to increase with increasing tiller number. The horizontal bars within boxes represent medians. The tops and bottoms of the boxes represent the 75th and 25th percentiles, respectively. The upper and lower whiskers extend to data within no more than 1.5× the interquartile range from the upper edge and lower edge of the box, respectively. Different letters indicate significantly different groups (P < 0.05, ANOVA, Tukey’s HSD).
+
+## S4F. Association between the Shannon indexes of root microbiota and corresponding tiller numbers in field II
 
 ```{r}
-metadata = read.table("../data/cultivar_HN_metadata.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
-level=c("<16","[16,23)","[23,30)","[30,37)","[38,45)",">=45")
-metadata$group = factor(metadata$group, level)
+method = "spearman"
+pheno = "tiller" 
 
-tax_phylum = read.table(paste("../data/cultivar_HN_taxj_pc.txt",sep=""), header=T, row.names=1, sep="\t", comment.char="") 
+phenotype = read.table("../data/cultivar_HN_pheno.txt", header=T, row.names=1, sep="\t", comment.char="", stringsAsFactors=F)
+alpha = read.table("../data/cultivar_HN_alpha.txt", header=T, row.names=1, sep="\t", comment.char="",quote="")
+Subspecies = read.table(paste0("../data/cultivar.txt"), header=T, row.names=1, sep="\t", comment.char="",quote="")
+alpha = as.data.frame(t(alpha))
+# filter
+idx = colnames(alpha) %in% rownames(phenotype)
+alpha = alpha[,idx]
+phenotype = phenotype[colnames(alpha),]
 
-library(amplicon)
-(p = tax_stackplot(tax_phylum, metadata, topN = 8, groupID = "group", style = "group", sorted = "abundance"))
-p = p + xlab("Ranges of tiller number") + theme(legend.position = "bottom")
-ggsave(paste("S4d.HN_tax_PC_tiller.pdf", sep=""), p, width = w, height = h*1.3, units = "mm")
+alpha_mean = as.data.frame(rowMeans(alpha))
+alpha_median = as.data.frame(apply(alpha,1,median))
 
-# tax_stackplot #----
-tax_sum = tax_phylum
-metadat = metadata
-topN = 8
-groupID = "group"
-style = "group"
-sorted = "abundance"
+# select alpha index
+top = c("richness","shannon_e","chao1")
+# filter
+idx = top %in% rownames(alpha)
+top = top[idx]
+alpha = alpha[top,]
+data = cbind(t(alpha), phenotype, Subspecies[rownames(phenotype),c("Subspecies")])
+colnames(data)[length(colnames(data))] = "Subspecies"
 
-p_list = c("ggplot2", "reshape2")
-for (p in p_list) {
-    if (!requireNamespace(p)) {
-        install.packages(p)
-    }
-    library(p, character.only = TRUE, quietly = TRUE, warn.conflicts = FALSE)
-}
-idx = rownames(metadata) %in% colnames(tax_sum)
-metadata = metadata[idx, ]
-tax_sum = tax_sum[, rownames(metadata)]
-sampFile = as.data.frame(metadata[, groupID], row.names = row.names(metadata))
-colnames(sampFile)[1] = "group"
-mean_sort = as.data.frame(tax_sum[(order(-rowSums(tax_sum))), 
-    ])
-other = colSums(mean_sort[topN:dim(mean_sort)[1], ])
-mean_sort = mean_sort[1:(topN - 1), ]
-mean_sort = rbind(mean_sort, other)
-rownames(mean_sort)[topN] = c("Other")
-merge_tax = mean_sort
+# Save table
+write.table("Genus\t", file=paste("S4F.alpha.tiller.Cor.HN.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
+suppressWarnings(write.table(data, file=paste("S4F.alpha.tiller.Cor.HN.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
 
-group.cor = as.data.frame(cor(t(mean_sort), as.numeric(gsub("T","",metadata$tiller_cat)), method = "spearman"))
-library(psych)
-p = corr.test(t(mean_sort), as.numeric(gsub("T","",metadata$tiller_cat)), method = "spearman")  
-group.cor2 = cbind(group.cor, p$p)
-colnames(group.cor2)=c("Cor","Pvalue")
-write.table("OTUID\t", file=paste("S4d.HN_phylum_tax_cor_sample.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
-suppressWarnings(write.table(round(group.cor2,digits = 3), file=paste("S4d.HN_phylum_tax_cor_sample.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+result = matrix(0, ncol = 9, nrow = ncol(t(alpha)))
+colnames(result) = c("feature", "env", "rho", "pvalue", "r2", "slope", "intercept", "mean", "median")
 
-mat_t = t(merge_tax)
-mat_t2 = merge(sampFile, mat_t, by = "row.names")
-mat_t2 = mat_t2[, c(-1)]
-mat_mean = aggregate(mat_t2[, -1], by = mat_t2[1], FUN = mean)
-mat_mean_final = do.call(rbind, mat_mean)[-1, ]
-geno = mat_mean$group
-colnames(mat_mean_final) = geno
-mean_sort = as.data.frame(mat_mean_final)
-mean_sort$Taxonomy = rownames(mean_sort)
-data_all = as.data.frame(melt(mean_sort, id.vars = c("Taxonomy")))
-
-group.cor = as.data.frame(cor(t(mean_sort[,1:6]), 1:6, method = "spearman"))
-library(psych)
-p = corr.test(t(mean_sort[,1:6]), 1:6, method = "spearman")  #计算p值
-# p$p
-group.cor2 = cbind(group.cor, p$p)
-colnames(group.cor2)=c("Cor","Pvalue")
-write.table("OTUID\t", file=paste("S4d.HN_phylum_tax_cor.txt",sep = ""), append = F, sep="\t", quote=F,  eol = "",row.names=F, col.names=F)
-suppressWarnings(write.table(round(group.cor2,digits = 3), file=paste("S4d.HN_phylum_tax_cor.txt",sep = ""), append = T, sep="\t", quote=F, row.names=T, col.names=T))
+for (i in 1:length(top)){
+  df = data[,c(top[i], pheno)] 
+  cor = cor.test(df[,1], df[,2], method = method)
+  result[i,1] = colnames(df)[1]
+  result[i,2] = colnames(df)[2]
+  result[i,3] = cor$estimate
+  result[i,4] = cor$p.value
+  df2 = df
+  colnames(df2) = c("x", "y")
+  m = lm(y ~ x, df2)
+  eqn = lm_eqn(df2)
+  result[i,5] = summary(m)$r.squared
+  result[i,6] = coef(m)[2]
+  result[i,7] = coef(m)[1]
+  result[i,8] = alpha_mean[top[i],]
+  result[i,9] = alpha_median[top[i],]
+  if (is.na(cor$estimate)){
+    next;
+  }
+  library(RColorBrewer)
+  p = ggplot(df2, aes(x, y)) +
+    geom_point(size=0.7) + # aes(color=group)
+    geom_smooth(method = "lm") +
+    labs(x = top[i], y = pheno,
+         title = paste("r = " , round(cor$estimate, digits = 2), ", p = " , signif(cor$p.value, digits = 2), ", R2 = ", round(summary(m)$r.squared, digits = 2) , sep = ""))  +  # "Rho = " , round(cor$estimate, digits = 2), ", 
+    theme_bw() + main_theme  + ylab("Tiller number") + theme(plot.title=element_text(size=7),text = element_text(family = "sans", size = 7), axis.text=element_text(size=7))
+  ggsave(paste("S4F.HN_cor", top[i], ".pdf", sep = "_"), p,  width = w, height = h, units = "mm") }
 ```
+
+(F) Scatter plot showing the association between Shannon indexes of root microbiota and corresponding tiller numbers in 165 rice varieties (P = 3.6  103, r = 0.23). Note that data obtained in the other test field showed the same trend (Figure 2). The numbers of varieties are as follows: aus (n = 37), indica (n = 66), tropical japonica (n = 35), and temperate japonica (n = 27).

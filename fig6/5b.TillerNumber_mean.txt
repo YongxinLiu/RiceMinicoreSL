@@ -1,8 +1,0 @@
-group	d10	d14	d17	d53	Nip
-TillerNumber	131.25	 55.10	 95.10	 56.05	 19.00
-group	Nip	d10	d17	d14	d53
-TillerNumber	 19.00	131.25	 95.10	 55.10	 56.05
-group	Nip	d10	d17	d14	d53
-TillerNumber	 19.00	131.25	 95.10	 55.10	 56.05
-group	Nip	d10	d17	d14	d53
-TillerNumber	 19.00	131.25	 95.10	 55.10	 56.05

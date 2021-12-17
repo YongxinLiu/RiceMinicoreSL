@@ -1,9 +1,0 @@
-OTUID	Cor	Pvalue
-Betaproteobacteria	-0.372	0
-Alphaproteobacteria	-0.111	0.191
-Deltaproteobacteria	0.452	0
-Actinobacteria	0.383	0
-Firmicutes	-0.13	0.191
-Bacteroidetes	0.423	0
-Unassigned	0.426	0
-Other	0.271	0.001
